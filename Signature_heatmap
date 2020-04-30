@@ -1,0 +1,95 @@
+#Mapping the NOR and MES signatures in control and 2-8 days RA treated KCNR cells (3 replicates)
+#txt file from partek flow
+setwd("/Volumes/Home01/banerjeed/Project_Super_Enhancer/Analysis/RNA-Seq_Time_Course")
+#RNA <- read.table("Partek_RNA+SEq_KCNR_Time_Course_Normalize_counts_Normalized_count_data.txt", header=T)
+#ncol(RNA)
+#RNA_Exp <- subset(RNA, select = c(5,7,8,10,12,15,16,18,20,24,25,27,29))
+#head(RNA_Exp)
+#colnames(RNA_Exp) <- c("Gene_Symbol","Control_2D_R3","RA_2D_R3","RA_4D_R3","RA_8D_R3","Control_2D_R2","RA_2D_R2","RA_4D_R2","RA_8D_R2","Control_2D_R1","RA_2D_R1","RA_4D_R1","RA_8D_R1")
+#ordered_column_names <- c("Gene_Symbol","Control_2D_R1","Control_2D_R2","Control_2D_R3",
+                       # "RA_2D_R1","RA_2D_R2","RA_2D_R3","RA_4D_R1","RA_4D_R2","RA_4D_R3","RA_8D_R1","RA_8D_R2","RA_8D_R3")
+#RNA_Exp <- RNA_Exp[,ordered_column_names]
+#row.names(RNA_Exp) <- RNA_Exp$Gene_Symbol # makes $Gene_Symbol row names
+
+#Load normalized gene count from DESeq2 analysis
+RNA_Seq <- read.csv("KCNR_RNA_Seq_NormalizedCounts_Deseq2.csv", row.names=1)
+
+#Load the 4D-Diff RNA file for getting the order of fold change
+RNA_4D_Diff_Exp <- read.csv("KCNR_4D_Diff_Exp_Batch.csv")
+row.names(RNA_4D_Diff_Exp) <- RNA_4D_Diff_Exp$X
+RNA_4D_Diff_Exp_FC_ordered <- RNA_4D_Diff_Exp[order(RNA_4D_Diff_Exp$log2FoldChange),] #orders by fold changes
+
+##Load signature txt files
+
+# MES Signature
+MES <- read.table("MES_Signature.txt")
+row.names(MES) <- MES$V1
+
+# ADRN Signature
+ADRN <- read.table("ADRN_Signature.txt")
+row.names(ADRN) <- ADRN$V1
+
+# subset the RNA seq file for MES Signatures 
+MES_Sign <- RNA_Seq[row.names(RNA_Seq) %in% row.names(MES), ] #filtering based on rownemas
+ADRN_Sign <- RNA_Seq[row.names(RNA_Seq) %in% row.names(ADRN), ]
+
+#Add rowname column for subsequent ordering
+MES_Order <- rownames(MES_Sign)
+MES_Sign <- cbind(MES_Sign,MES_Order)
+
+#Add rowname column for subsequent ordering
+ADRN_Order <- rownames(ADRN_Sign)
+ADRN_Sign <- cbind(ADRN_Sign,ADRN_Order)
+
+# subset the 4D-Diff RNA file for  Signatures  to get the order by fold change
+MES_Sign_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(MES), ]
+ADRN_Sign_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(ADRN), ]
+
+#re-order the signature RNA seq file as per ascending order of 4D fold change 
+MES_Sign_FCordered <- MES_Sign[match(MES_Sign_4D_Diff_FC_Ordered$X,MES_Sign$MES_Order), c(1:3,10:18)] # remove rowname column as we donot need it for heatmap
+ADRN_Sign_FCordered <- ADRN_Sign[match(ADRN_Sign_4D_Diff_FC_Ordered$X,ADRN_Sign$ADRN_Order),c(1:3,10:18)] 
+
+write.csv(as.data.frame(MES_Sign_4D_Diff_FC_Ordered),file="MES_Sign_4D_Diff_FC_Ordered.csv")
+write.csv(as.data.frame(ADRN_Sign_4D_Diff_FC_Ordered),file="ADRN_Sign_4D_Diff_FC_Ordered.csv")
+
+# make matrix for heatmap
+MES_Sign_matrix <- data.matrix(MES_Sign_FCordered)
+ADRN_Sign_matrix <- data.matrix(ADRN_Sign_FCordered)
+
+#make heatmap for signatures
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+#make the heatmap#
+pdf("MES_Signature_RA_treatment_FC_ordered.pdf")
+heatmap.2(MES_Sign_matrix, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.2, cexCol=0.5)
+dev.off()
+
+pdf("ADRN_Signature_RA_treatment_FC_ordered.pdf")
+heatmap.2(ADRN_Sign_matrix, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.3, cexCol=0.5)
+dev.off()
+
+## Subset for TFs
+TFs <- read.csv("Transcription Factors hg19.csv", header = TRUE, row.names = 2)
+MES_Sign_TF <- MES_Sign_FCordered[row.names(MES_Sign_FCordered) %in% row.names(TFs), ]
+write.csv(as.data.frame(MES_Sign_TF),file="MES_Sign_TF.csv")
+MES_Sign_TF_matrix <- data.matrix(MES_Sign_TF)
+heatmap.2(MES_Sign_TF_matrix, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.5, cexCol=0.5)
+
+
+ADRN_Sign_TF <- ADRN_Sign_FCordered[row.names(ADRN_Sign_FCordered) %in% row.names(TFs), ]
+write.csv(as.data.frame(ADRN_Sign_TF),file="ADRN_Sign_TF.csv")
+ADRN_Sign_TF_matrix <- data.matrix(ADRN_Sign_TF)
+heatmap.2(ADRN_Sign_TF_matrix, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.5, cexCol=0.5)
+
+
+
+##filtering MES and ADRN Signatures
+
+#RNA_4D_Diff_Exp_FC_ordered <- RNA_4D_Diff_Exp[order(RNA_4D_Diff_Exp$log2FoldChange),] #orders by fold changes
+#RNA_4D_Diff_Exp_FC_ordered <- as.data.frame(RNA_4D_Diff_Exp_FC_ordered)
+#MES_Sign_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(MES), ]
+#MES_Order <- rownames(MES_Sign_4D_Diff_FC_Ordered)
+#MES_Sign_4D_Diff_FC_Ordered <- cbind(MES_Sign_4D_Diff_FC_Ordered,MES_Order)
+#ADRN_Sign_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(ADRN), ]
+#ADRN_Order <- rownames(ADRN_Sign_4D_Diff_FC_Ordered)
+#ADRN_Sign_4D_Diff_FC_Ordered <- cbind(ADRN_Sign_4D_Diff_FC_Ordered,ADRN_Order)
