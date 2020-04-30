@@ -1,0 +1,115 @@
+
+setwd("/Volumes/Home01/banerjeed/Project_Super_Enhancer/Analysis/RNA-Seq_Time_Course")
+
+#Load normalized gene count from DESeq2 analysis
+RNA_Seq <- read.csv("KCNR_RNA_Seq_NormalizedCounts_Deseq2.csv", row.names=1)
+
+#Load the Diff RNA file for getting the order of fold change
+RNA_2D_Diff_Exp <- read.csv("KCNR_2D_Diff_Exp_Batch.csv")
+row.names(RNA_2D_Diff_Exp) <- RNA_2D_Diff_Exp$X
+RNA_2D_Diff_Exp_FC_ordered <- RNA_2D_Diff_Exp[order(RNA_2D_Diff_Exp$log2FoldChange),] #orders by fold changes
+
+RNA_4D_Diff_Exp <- read.csv("KCNR_4D_Diff_Exp_Batch.csv")
+row.names(RNA_4D_Diff_Exp) <- RNA_4D_Diff_Exp$X
+RNA_4D_Diff_Exp_FC_ordered <- RNA_4D_Diff_Exp[order(RNA_4D_Diff_Exp$log2FoldChange),]
+
+RNA_8D_Diff_Exp <- read.csv("KCNR_8D_Diff_Exp_Batch.csv")
+row.names(RNA_8D_Diff_Exp) <- RNA_8D_Diff_Exp$X
+RNA_8D_Diff_Exp_FC_ordered <- RNA_8D_Diff_Exp[order(RNA_8D_Diff_Exp$log2FoldChange),]
+
+
+##lost cluster
+# Load the cluster txt files
+LC <- read.table("Lost_Cluster.txt", row.names =1)
+LC_RNA_Exp <- RNA_Seq[row.names(RNA_Seq) %in% row.names(LC), c(1:3,10:18)]
+write.csv(as.data.frame(LC_RNA_Exp),file="LostCluster_TF_RNA_Exp.csv")
+
+#Add rowname column for subsequent ordering
+LC_Order <- rownames(LC_RNA_Exp)
+LC_RNA_Exp <- cbind(LC_RNA_Exp,LC_Order)
+
+# subset the 2D-Diff RNA file for  clusters  to get the order by fold change
+LC_2D_Diff_FC_Ordered <- RNA_2D_Diff_Exp_FC_ordered[rownames(RNA_2D_Diff_Exp_FC_ordered) %in% rownames(LC), ]
+write.csv(as.data.frame(LC_2D_Diff_FC_Ordered),file="LostCluster_TF_2D_Diff_FC_Ordered.csv")
+
+#re-order the Cluster RNA seq file as per ascending order of 2D fold change 
+LC_FCordered <- LC_RNA_Exp[match(LC_2D_Diff_FC_Ordered$X,LC_RNA_Exp$LC_Order), c(1:12)] # remove rowname column as we donot need it for heatmap
+
+#draw the heatmap
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+LC.m <- data.matrix(LC_FCordered)
+heatmap.2(LC.m, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.6)
+
+##first wave cluster
+# Load the cluster txt files
+FW <- read.table("First_Wave.txt", row.names =1)
+FW_RNA_Exp <- RNA_Seq[row.names(RNA_Seq) %in% row.names(FW), c(1:3,10:18)]
+write.csv(as.data.frame(FW_RNA_Exp),file="First_TF_RNA_Exp.csv")
+
+#Add rowname column for subsequent ordering
+FW_Order <- rownames(FW_RNA_Exp)
+FW_RNA_Exp <- cbind(FW_RNA_Exp,FW_Order)
+
+# subset the 2D-Diff RNA file for  clusters  to get the order by fold change
+FW_2D_Diff_FC_Ordered <- RNA_2D_Diff_Exp_FC_ordered[rownames(RNA_2D_Diff_Exp_FC_ordered) %in% rownames(FW), ]
+write.csv(as.data.frame(FW_2D_Diff_FC_Ordered),file="FirstWave_TF_2D_Diff_FC_Ordered.csv")
+
+#re-order the Cluster RNA seq file as per ascending order of 2D fold change 
+FW_FCordered <- FW_RNA_Exp[match(FW_2D_Diff_FC_Ordered$X,FW_RNA_Exp$FW_Order),c(1:12)] # remove rowname column as we donot need it for heatmap
+FW_FCordered <- FW_FCordered[rev(rownames(FW_FCordered)),] 
+
+
+#draw the heatmap
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+FW.m <- data.matrix(FW_FCordered)
+heatmap.2(FW.m, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.7)
+
+##Second wave cluster
+# Load the cluster txt files
+SW <- read.table("Second_Wave.txt", row.names =1)
+SW_RNA_Exp <- RNA_Seq[row.names(RNA_Seq) %in% row.names(SW), c(1:3,10:18)]
+write.csv(as.data.frame(SW_RNA_Exp),file="Second_TF_RNA_Exp.csv")
+
+#Add rowname column for subsequent ordering
+SW_Order <- rownames(SW_RNA_Exp)
+SW_RNA_Exp <- cbind(SW_RNA_Exp,SW_Order)
+
+# subset the 4D-Diff RNA file for  clusters  to get the order by fold change
+SW_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(SW), ]
+write.csv(as.data.frame(SW_4D_Diff_FC_Ordered),file="SecondWave_TF_4D_Diff_FC_Ordered.csv")
+
+#re-order the Cluster RNA seq file as per ascending order of 2D fold change 
+SW_FCordered <- SW_RNA_Exp[match(SW_4D_Diff_FC_Ordered$X,SW_RNA_Exp$SW_Order), c(1:12)] # remove rowname column as we donot need it for heatmap
+SW_FCordered <- SW_FCordered[rev(rownames(SW_FCordered)),] 
+
+#draw the heatmap
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+SW.m <- data.matrix(SW_FCordered)
+heatmap.2(SW.m, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.7)
+
+##Third wave cluster
+# Load the cluster txt files
+TW <- read.table("Third_Wave.txt", row.names =1)
+TW_RNA_Exp <- RNA_Seq[row.names(RNA_Seq) %in% row.names(TW), c(1:3,10:18)]
+write.csv(as.data.frame(TW_RNA_Exp),file="ThirdWave_TF_RNA_Exp.csv")
+
+#Add rowname column for subsequent ordering
+TW_Order <- rownames(TW_RNA_Exp)
+TW_RNA_Exp <- cbind(TW_RNA_Exp,TW_Order)
+
+# subset the 4D-Diff RNA file for  clusters  to get the order by fold change
+TW_4D_Diff_FC_Ordered <- RNA_4D_Diff_Exp_FC_ordered[rownames(RNA_4D_Diff_Exp_FC_ordered) %in% rownames(TW), ]
+write.csv(as.data.frame(TW_4D_Diff_FC_Ordered),file="ThirdWave_TF_4D_Diff_FC_Ordered.csv")
+
+#re-order the Cluster RNA seq file as per ascending order of 2D fold change 
+TW_FCordered <- TW_RNA_Exp[match(TW_4D_Diff_FC_Ordered$X,TW_RNA_Exp$TW_Order), c(1:12)] # remove rowname column as we donot need it for heatmap
+TW_FCordered <- TW_FCordered[rev(rownames(TW_FCordered)),] 
+
+#draw the heatmap
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+TW.m <- data.matrix(TW_FCordered)
+heatmap.2(TW.m, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.7)
