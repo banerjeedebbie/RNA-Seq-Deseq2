@@ -1,0 +1,91 @@
+#txt file from partek flow
+#Deseq2 requires Gene Level Quantification file
+setwd("/Volumes/Home01/banerjeed/Project_Super_Enhancer/Analysis/RNA-Seq_Time_Course")
+RNA_Count <- read.table("Partek_RNA+SEq_KCNR_Time_Course_GeneLevelQuantification.txt", header=T) #load raw genecount file
+RNA_Sub <- subset(RNA_Count, select = c(5,7:12,15:20,24:29)) # subset required rows
+colnames(RNA_Sub) <- c("Gene_Symbol","Control_2D_R3","RA_2D_R3","Control_4D_R3","RA_4D_R3","Control_8D_R3","RA_8D_R3","Control_2D_R2","RA_2D_R2","Control_4D_R2","RA_4D_R2","Control_8D_R2","RA_8D_R2","Control_2D_R1","RA_2D_R1","Control_4D_R1","RA_4D_R1","Control_8D_R1","RA_8D_R1") # create a vector with column name
+ordered_column_names <- c("Gene_Symbol","Control_2D_R1","Control_2D_R2","Control_2D_R3","Control_4D_R1","Control_4D_R2","Control_4D_R3","Control_8D_R1","Control_8D_R2","Control_8D_R3","RA_2D_R1","RA_2D_R2","RA_2D_R3","RA_4D_R1","RA_4D_R2","RA_4D_R3","RA_8D_R1","RA_8D_R2","RA_8D_R3") # new column order by column names
+RNA_Sub <- RNA_Sub[,ordered_column_names] #change the order of the columns
+RNA_Exp_1 <- RNA_Sub[,-1]
+rownames(RNA_Exp_1) <- RNA_Sub[,1] # assign 1st column as row name
+
+# prepare datasheet for analysis with Deseq2
+library(DESeq2)
+# Reading and preparing data
+RNA_Exp.m <- data.matrix(RNA_Exp_1) # reads as matrix
+coldata <- read.table("colData.txt",row.names=1, header= T) # sample info
+
+# Running DESEQ
+dds <- DESeqDataSetFromMatrix(countData = round(RNA_Exp.m), #converts counts to integer mode
+                              colData = coldata,
+                              design= ~ batch + condition) # batch correction included in design, if doing batch correction it should always be the first variable followed by other conditions
+counts(dds[1:15,]) # some chceking
+dds <- DESeq(dds)
+
+#Extracting normalized counts
+NormalizedCounts <- counts(dds, normalized=TRUE) 
+NormalizedCounts.df <- as.data.frame(NormalizedCounts)
+write.csv(as.data.frame(NormalizedCounts),file="KCNR_RNA_Seq_NormalizedCounts_Deseq2.csv")
+
+
+#transformations which produce log-scale data (on the log2 scale)
+#vsd <- vst(dds)
+#class(vsd)
+#assay(vsd)[20000:20010,1:2] # first entity gives number of rows from 1 through *, next # of columns 1 through *
+#write.csv(as.data.frame(as.table(vsd)),file="KCNR_RNA_Seq_NormalizedCounts_Log2_Deseq2.csv")
+
+#running Differential anlaysis with different combinations by chandging the conditions
+RNA_4D_Diff_Exp_2 <- results(dds, contrast=c("condition","4D_treated", "2D_untreated"))
+head(RNA_4D_Diff_Exp_2)
+write.csv(as.data.frame(RNA_4D_Diff_Exp_2),file="KCNR_4D_Diff_Exp_Batch_2.csv")
+
+RNA_4D_Diff_Exp_FC_ordered <- as.data.frame(RNA_4D_Diff_Exp_2[order(RNA_4D_Diff_Exp_2$log2FoldChange),])
+RNA_4D_Diff_Exp_FC_ordered.sig <- RNA_4D_Diff_Exp_FC_ordered[which(RNA_4D_Diff_Exp_FC_ordered$padj <= 0.01), ]
+write.csv(RNA_4D_Diff_Exp_FC_ordered.sig ,file="RNA_4D_Diff_Exp_FC_ordered.sig.csv")
+head(RNA_4D_Diff_Exp_FC_ordered.sig)
+Order <- rownames(RNA_4D_Diff_Exp_FC_ordered.sig) # creates a vector with row names
+RNA_4D_Diff_Exp_FC_ordered.sig <- cbind(RNA_4D_Diff_Exp_FC_ordered.sig,Order) #binds the row name column
+
+# subset the normalized RNA file for 4D_SIg_DIff_genes
+NormalizedCounts.4D_Diff_df <- NormalizedCounts.df[rownames(NormalizedCounts.df) %in% rownames(RNA_4D_Diff_Exp_FC_ordered.sig), c(1:3,10:18)]
+Nor_Order <- rownames(NormalizedCounts.4D_Diff_df)
+NormalizedCounts.4D_Diff_df <- cbind(NormalizedCounts.4D_Diff_df,Nor_Order)
+#write.csv(as.data.frame(SW_4D_Diff_FC_Ordered),file="SecondWave_TF_4D_Diff_FC_Ordered.csv")
+
+#re-order the Cluster RNA seq file as per ascending order of 4D fold change 
+NormalizedCounts.4D_Diff_df_FCordered <- NormalizedCounts.4D_Diff_df[match(NormalizedCounts.4D_Diff_df$Nor_Order,RNA_4D_Diff_Exp_FC_ordered.sig$Order), c(1:12)] # remove rowname column as we donot need it for heatmap
+
+#draw the heatmap
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+df.m <- data.matrix(NormalizedCounts.4D_Diff_df_FCordered)
+pdf("KCNR_Time_Course_Diff_Exp.pdf")
+heatmap.2(df.m, col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.7)
+dev.off()
+
+#for replotting RNA-seq heatmap
+RNA_seq <- read.csv("KCNR_RNA_Seq_NormalizedCounts_Deseq2.csv", header = TRUE, row.names = 1)
+Diff <- read.csv("KCNR_2D_Diff_Exp_Batch.csv", header = TRUE, row.names = 1)
+Diff.sig <- Diff[which(Diff$padj <= 0.01), ]
+Diff.sig <- Diff.sig[order(Diff.sig$log2FoldChange), ]
+NormalizedCounts.Diff_df <- RNA_seq[rownames(RNA_seq) %in% rownames(Diff.sig), c(1:3,10:18)]
+NormalizedCounts.Diff_df <- NormalizedCounts.Diff_df[match(row.names(Diff.sig), row.names(NormalizedCounts.Diff_df)), ] # matching the count fiole based on diff file rowname order
+
+
+library("gplots")
+mycol <- colorpanel(n=99, low="blue", mid="white", high="red")
+pdf("KCNR_Time_Course_Diff_Exp.pdf")
+heatmap.2(as.matrix(NormalizedCounts.Diff_df), col=mycol, key=TRUE, symkey=FALSE, dendrogram = "none", scale="row", Colv = FALSE, Rowv=FALSE, density.info="none", trace="none", cexRow=0.7, cexCol=0.7)
+dev.off()
+
+
+library (ggplot2)
+library(dplyr)
+Diff_exp <- read.csv("KCNR_4D_Diff_Exp_Batch.csv", row.names = 1)
+Vol_df <- data.frame(log2FC = Diff_exp$log2FoldChange,
+                 logpv = -log10(Diff_exp$padj))
+Vol_df<-Vol_df%>%mutate(threshold = ifelse(log2FC >= 0.58,"1.5 Fold Up-regulated", ifelse(log2FC<=-0.58, "1.5 Fold Down-regulated", "No-change")))
+
+ggplot(Vol_df, aes(x=log2FC, y=logpv)) + geom_point(aes(colour = threshold),size=0.5) + xlim(c(-10, 10)) + xlab("log2 fold change") + ylab("-log10 p-value") + scale_colour_manual(values = c("1.5 Fold Up-regulated"= "red1", "1.5 Fold Down-regulated"="blue3",  "No-change"= "grey70")) + scale_y_continuous(trans = "log1p") + geom_hline(yintercept = 1, colour="grey40", linetype="dashed") + geom_vline(xintercept = 0.586, colour="grey40", linetype="dashed") + geom_vline(xintercept = -0.586, colour="grey40", linetype="dashed") 
+
+
